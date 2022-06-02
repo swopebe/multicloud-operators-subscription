@@ -15,14 +15,18 @@
 package utils
 
 import (
+	"context"
 	"reflect"
 	"testing"
+	"time"
 
+	"github.com/onsi/gomega"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
 
 	appv1alpha1 "open-cluster-management.io/multicloud-operators-subscription/pkg/apis/apps/v1"
 )
@@ -33,6 +37,71 @@ var (
 	refSrtName = "target-referred-sercet"
 	srtGVK     = schema.GroupVersionKind{Group: "", Kind: SecretKindStr, Version: "v1"}
 )
+
+func TestListAndDeployReferredObject(t *testing.T) {
+	testCases := []struct {
+		desc        string
+		refSrt      *corev1.Secret
+		sub         *appv1alpha1.Subscription
+		deployedSrt types.NamespacedName
+		srtOwners   corev1.ObjectReference
+	}{
+		{
+			desc: "no secert at namespace",
+			refSrt: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					ResourceVersion: srtGVK.String(),
+					Name:            refSrtName,
+				},
+			},
+			sub: &appv1alpha1.Subscription{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "sub-a",
+					Namespace: nssubTest,
+					UID:       types.UID("sub-uid"),
+				},
+				Spec: appv1alpha1.SubscriptionSpec{
+					Channel: chKey.String(),
+				},
+			},
+			deployedSrt: types.NamespacedName{Name: refSrtName, Namespace: nssubTest},
+			srtOwners:   corev1.ObjectReference{},
+		},
+	}
+
+	g := gomega.NewGomegaWithT(t)
+	// Setup the Manager and Controller.  Wrap the Controller Reconcile function so it writes each request
+	mgr, err := manager.New(cfg, manager.Options{MetricsBindAddress: "0"})
+	g.Expect(err).NotTo(gomega.HaveOccurred())
+
+	c = mgr.GetClient()
+
+	ctx, cancel := context.WithTimeout(context.TODO(), 5*time.Minute)
+	mgrStopped := StartTestManager(ctx, mgr, g)
+
+	defer func() {
+		cancel()
+		mgrStopped.Wait()
+	}()
+
+	gotSrt := &corev1.Secret{}
+
+	defer func() {
+		c.Delete(context.TODO(), gotSrt)
+	}()
+
+	for _, tC := range testCases {
+		t.Run(tC.desc, func(t *testing.T) {
+			g.Expect(ListAndDeployReferredObject(c, tC.sub, srtGVK, tC.refSrt)).ShouldNot(gomega.HaveOccurred())
+
+			g.Expect(c.Get(context.TODO(), tC.deployedSrt, gotSrt)).Should(gomega.BeNil())
+
+			time.Sleep(time.Second * 2)
+			t.Logf("at test case %v got referred object %v ", tC.desc, gotSrt)
+
+		})
+	}
+}
 
 func TestIsOwnedBy(t *testing.T) {
 	owerName := "sub-a"
