@@ -22,7 +22,7 @@
     - [Standalone Cluster Role](#standalone-cluster-role)
     - [Standalone Cluster RoleBinding](#standalone-cluster-rolebinding)
     - [Standalone Cluster Scrapping Verification](#standalone-cluster-scrapping-verification)
-- [Troubleshooting](#troubleshooting)
+- [Troubleshooting](#troubleshooting) <!-- Troubleshooting Portal -->
   - [Hub Cluster Metrics Service Missing](#hub-cluster-metrics-service-missing)
   - [Managed Cluster Metrics Service Missing](#managed-cluster-metrics-service-missing)
   - [Standalone Cluster Metrics Service Missing](#standalone-cluster-metrics-service-missing)
